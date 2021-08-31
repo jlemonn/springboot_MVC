@@ -7,7 +7,8 @@ on: # Event
     branches: [ main, develop ]
 
 jobs: 
-  test: # Job id
+  
+  build: # Job id
     runs-on: ubuntu-latest # Runner
     
     steps:
@@ -33,3 +34,19 @@ jobs:
       env:
         SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }} # required
       if: always() # Pick up events even if the job fails or is canceled.
+  
+  deploy:
+    needs: build
+    name: Deploy
+    runs-on: [ self-hosted, label-development ]
+    steps:
+      - name: Login to ghcr
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.CR_PAT }}
+      - name: Docker run
+        run: |
+          docker ps -q --filter "name=cat" | grep -q . && docker stop cat && docker rm -fv cat
+          docker run -d -p 8000:8000 --name cicd --restart always ${{ env.DOCKER_IMAGE }}:${{ env.VERSION }}
